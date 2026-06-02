@@ -1,5 +1,6 @@
 import { parseLsblk, parseSmartctl, parseZpoolList } from "./parsers.js";
 
+const cockpit = window.cockpit;
 const disksEl = document.getElementById("disks");
 const historyEl = document.getElementById("history");
 const lastTsEl = document.getElementById("last-timestamp");
