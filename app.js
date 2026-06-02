@@ -176,11 +176,24 @@ async function saveSnapshot(snapshot) {
     const dirPath = snapshotFilePath.substring(0, snapshotFilePath.lastIndexOf("/"));
     await runCommand(["mkdir", "-p", dirPath]);
 
-    const snapshotLine = JSON.stringify(snapshot) + "\n";
-    const b64 = btoa(unescape(encodeURIComponent(snapshotLine)));
+    const file = window.cockpit.file(snapshotFilePath);
+    let currentContent = "";
+    try {
+      currentContent = await file.read();
+    } catch (e) {
+      // File might not exist yet, ignore
+    }
+
+    let lines = currentContent ? currentContent.trim().split(/\r?\n/).filter(Boolean) : [];
+    lines.push(JSON.stringify(snapshot));
     
-    await runCommand(["sh", "-c", `echo "${b64}" | base64 -d >> "${snapshotFilePath}"`]);
-    await runCommand(["sh", "-c", `tail -n 500 "${snapshotFilePath}" > "${snapshotFilePath}.tmp" && mv "${snapshotFilePath}.tmp" "${snapshotFilePath}"`]);
+    // Prune to last 500 entries
+    if (lines.length > 500) {
+      lines = lines.slice(lines.length - 500);
+    }
+    
+    const newContent = lines.join("\n") + "\n";
+    await file.replace(newContent);
   } catch (err) {
     console.error("Failed to save snapshot", err);
   }
@@ -189,10 +202,15 @@ async function saveSnapshot(snapshot) {
 async function loadSnapshots(limit = 100) {
   if (!snapshotFilePath) return [];
   try {
-    const res = await runCommand(["cat", snapshotFilePath]);
-    if (res.code !== 0) return [];
-    
-    const content = res.stdout;
+    const file = window.cockpit.file(snapshotFilePath);
+    let content = "";
+    try {
+      content = await file.read();
+    } catch (e) {
+      // If file doesn't exist, return empty array
+      return [];
+    }
+
     const lines = content ? content.trim().split(/\r?\n/).filter(Boolean) : [];
     const parsed = lines.map((line) => {
       try {
@@ -858,6 +876,7 @@ async function init() {
     snapshotFilePath = "/tmp/snapshots.jsonl";
   }
 
+  console.log("Disk Health extension initialized. History file path:", snapshotFilePath);
   await refreshHistory();
 }
 
