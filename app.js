@@ -1,4 +1,5 @@
 import { parseLsblk, parseSmartctl, parseZpoolList } from "./parsers.js";
+import { smartDescriptions } from "./smart_descriptions.js";
 
 const cockpit = window.cockpit;
 
@@ -175,19 +176,11 @@ async function saveSnapshot(snapshot) {
     const dirPath = snapshotFilePath.substring(0, snapshotFilePath.lastIndexOf("/"));
     await runCommand(["mkdir", "-p", dirPath]);
 
-    const file = cockpit.file(snapshotFilePath);
-    let content = "";
-    try {
-      content = await file.read();
-    } catch (e) {
-      // File might not exist yet, ignore
-    }
-    let lines = content ? content.trim().split(/\r?\n/).filter(Boolean) : [];
-    lines.push(JSON.stringify(snapshot));
-    if (lines.length > 500) {
-      lines = lines.slice(lines.length - 500);
-    }
-    await file.write(lines.join("\n") + "\n");
+    const snapshotLine = JSON.stringify(snapshot) + "\n";
+    const b64 = btoa(unescape(encodeURIComponent(snapshotLine)));
+    
+    await runCommand(["sh", "-c", `echo "${b64}" | base64 -d >> "${snapshotFilePath}"`]);
+    await runCommand(["sh", "-c", `tail -n 500 "${snapshotFilePath}" > "${snapshotFilePath}.tmp" && mv "${snapshotFilePath}.tmp" "${snapshotFilePath}"`]);
   } catch (err) {
     console.error("Failed to save snapshot", err);
   }
@@ -196,8 +189,10 @@ async function saveSnapshot(snapshot) {
 async function loadSnapshots(limit = 100) {
   if (!snapshotFilePath) return [];
   try {
-    const file = cockpit.file(snapshotFilePath);
-    const content = await file.read();
+    const res = await runCommand(["cat", snapshotFilePath]);
+    if (res.code !== 0) return [];
+    
+    const content = res.stdout;
     const lines = content ? content.trim().split(/\r?\n/).filter(Boolean) : [];
     const parsed = lines.map((line) => {
       try {
@@ -471,6 +466,12 @@ function renderSnapshot(snapshot) {
 
   disksEl.appendChild(tabs);
   disksEl.appendChild(content);
+
+  // Initialize Bootstrap Tooltips
+  if (window.bootstrap && window.bootstrap.Tooltip) {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].forEach(tooltipTriggerEl => new window.bootstrap.Tooltip(tooltipTriggerEl));
+  }
 }
 
 function renderAttrsTable(attrs) {
@@ -531,7 +532,14 @@ function renderSmartDetailsTable(disk) {
   });
 
   const body = rows
-    .map(([label, value]) => `<tr><th scope="row">${label}</th><td>${escapeHtml(value)}</td></tr>`)
+    .map(([label, value]) => {
+      const lookupKey = label.startsWith("NVMe ") ? label.substring(5).toLowerCase() : label.toLowerCase();
+      const desc = smartDescriptions[lookupKey] || "";
+      const tooltipHtml = desc 
+        ? ` <span class="text-muted" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeHtml(desc)}">ⓘ</span>`
+        : "";
+      return `<tr><th scope="row">${label}${tooltipHtml}</th><td>${escapeHtml(value)}</td></tr>`;
+    })
     .join("");
 
   return `
@@ -570,7 +578,14 @@ function renderNvme(nvme) {
   const keys = Object.keys(nvme || {});
   if (!keys.length) return "<div class=\"text-muted mt-2\">No NVMe data</div>";
   const rows = keys
-    .map((key) => `<tr><td>${toLabel(key)}</td><td>${escapeHtml(nvme[key])}</td></tr>`)
+    .map((key) => {
+      const label = toLabel(key);
+      const desc = smartDescriptions[key.toLowerCase()] || smartDescriptions[label.toLowerCase()] || "";
+      const tooltipHtml = desc 
+        ? ` <span class="text-muted" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeHtml(desc)}">ⓘ</span>`
+        : "";
+      return `<tr><td>${label}${tooltipHtml}</td><td>${escapeHtml(nvme[key])}</td></tr>`;
+    })
     .join("");
   return `
     <div class="table-responsive mt-2">
