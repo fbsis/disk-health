@@ -455,6 +455,14 @@ async function refreshSelfTests() {
         const nvmeRes = await runCommand(["nvme", "self-test-log", path, "-o", "json"], { superuser: "require" });
         if (nvmeRes.code === 0 && nvmeRes.stdout) {
           parsed = parseNvmeCliSelfTest(nvmeRes.stdout);
+          if (parsed) {
+            const powerOnMatch = output.match(/Power On Hours:\s*([0-9,]+)/i) || 
+                                 output.match(/Power_On_Hours\s+\S+\s+\d+\s+\d+\s+\d+\s+\S+\s+\S+\s+\S+\s+(\d+)/i) ||
+                                 output.match(/Power_On_Hours\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(\d+)/i);
+            if (powerOnMatch) {
+              parsed.powerOnHours = parseInt(powerOnMatch[1].replace(/,/g, ""), 10);
+            }
+          }
         } else {
           parsed = { error: "nvme-cli-missing" };
         }
