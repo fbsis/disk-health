@@ -1,4 +1,4 @@
-import { collectSnapshot } from "./data_collector.js";
+import { collectSnapshot, runCommand } from "./data_collector.js";
 import { 
   setSnapshotFilePath, 
   saveSnapshot, 
@@ -35,6 +35,12 @@ const schedOptionsGroup = document.getElementById("sched-options-group");
 const tgEnabledCheck = document.getElementById("settings-tg-enabled");
 const tgOptionsGroup = document.getElementById("tg-options-group");
 const btnTestTg = document.getElementById("btn-test-tg");
+const btnSaveSettings = document.getElementById("btn-save-settings");
+
+const settingsTestType = document.getElementById("settings-test-type");
+const settingsFrequency = document.getElementById("settings-frequency");
+const settingsTgToken = document.getElementById("settings-tg-token");
+const settingsTgChatId = document.getElementById("settings-tg-chat-id");
 
 schedEnabledCheck.addEventListener("change", () => {
   if (schedEnabledCheck.checked) {
@@ -51,6 +57,103 @@ tgEnabledCheck.addEventListener("change", () => {
   } else {
     tgOptionsGroup.classList.add("d-none");
     btnTestTg.classList.add("d-none");
+  }
+});
+
+async function loadConfig() {
+  const res = await runCommand(["cat", "/etc/disk-health-config.env"]);
+  const config = {
+    enabled: false,
+    testType: "none",
+    frequency: "daily",
+    telegramEnabled: false,
+    telegramToken: "",
+    telegramChatId: ""
+  };
+  if (res.code === 0 && res.stdout) {
+    const lines = res.stdout.split(/\r?\n/);
+    lines.forEach((line) => {
+      const parts = line.split("=");
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join("=").trim().replace(/^['"]|['"]$/g, "");
+        if (key === "ENABLED") config.enabled = val === "1";
+        if (key === "TEST_TYPE") config.testType = val;
+        if (key === "FREQUENCY") config.frequency = val;
+        if (key === "TELEGRAM_ENABLED") config.telegramEnabled = val === "1";
+        if (key === "TELEGRAM_TOKEN") config.telegramToken = val;
+        if (key === "TELEGRAM_CHAT_ID") config.telegramChatId = val;
+      }
+    });
+  }
+  return config;
+}
+
+async function populateSettingsModal() {
+  try {
+    const config = await loadConfig();
+    schedEnabledCheck.checked = config.enabled;
+    settingsTestType.value = config.testType;
+    settingsFrequency.value = config.frequency;
+    tgEnabledCheck.checked = config.telegramEnabled;
+    settingsTgToken.value = config.telegramToken;
+    settingsTgChatId.value = config.telegramChatId;
+
+    schedEnabledCheck.dispatchEvent(new Event("change"));
+    tgEnabledCheck.dispatchEvent(new Event("change"));
+  } catch (err) {
+    console.error("Failed to load settings configuration:", err);
+  }
+}
+
+async function saveConfig() {
+  const enabled = schedEnabledCheck.checked ? "1" : "0";
+  const testType = settingsTestType.value;
+  const frequency = settingsFrequency.value;
+  const tgEnabled = tgEnabledCheck.checked ? "1" : "0";
+  const tgToken = settingsTgToken.value.trim();
+  const tgChatId = settingsTgChatId.value.trim();
+
+  const lines = [
+    `ENABLED=${enabled}`,
+    `TEST_TYPE="${testType}"`,
+    `FREQUENCY="${frequency}"`,
+    `TELEGRAM_ENABLED=${tgEnabled}`,
+    `TELEGRAM_TOKEN="${tgToken}"`,
+    `TELEGRAM_CHAT_ID="${tgChatId}"`
+  ];
+  const content = lines.join("\n") + "\n";
+
+  const writeRes = await runCommand(["tee", "/etc/disk-health-config.env"], { 
+    superuser: "require", 
+    input: content 
+  });
+
+  if (writeRes.code !== 0) {
+    throw new Error(`Failed to write config file: ${writeRes.error || "unknown error"}`);
+  }
+
+  alert("Settings saved successfully!");
+  const modalEl = document.getElementById("modal-settings");
+  const modalInstance = window.bootstrap.Modal.getInstance(modalEl);
+  if (modalInstance) modalInstance.hide();
+}
+
+const modalEl = document.getElementById("modal-settings");
+modalEl.addEventListener("show.bs.modal", async () => {
+  await populateSettingsModal();
+});
+
+btnSaveSettings.addEventListener("click", async () => {
+  btnSaveSettings.disabled = true;
+  btnSaveSettings.textContent = "Saving...";
+  try {
+    await saveConfig();
+  } catch (err) {
+    alert("Error saving settings: " + err.message);
+  } finally {
+    btnSaveSettings.disabled = false;
+    btnSaveSettings.textContent = "Save Settings";
   }
 });
 
