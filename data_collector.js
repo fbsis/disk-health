@@ -9,8 +9,10 @@ export function runCommand(args, options = {}) {
       resolve({ stdout: "", code: -1, error: "Cockpit not loaded" });
       return;
     }
-    cockpit.spawn(args, options)
-      .done((stdout) => {
+    const { input, ...spawnOptions } = options;
+    const proc = cockpit.spawn(args, spawnOptions);
+    
+    proc.done((stdout) => {
         resolve({ stdout, code: 0 });
       })
       .fail((exception, stdout) => {
@@ -20,6 +22,11 @@ export function runCommand(args, options = {}) {
           error: exception.message || String(exception)
         });
       });
+      
+    if (input !== undefined && input !== null) {
+      proc.input(input);
+      proc.close();
+    }
   });
 }
 
