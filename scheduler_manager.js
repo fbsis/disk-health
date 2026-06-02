@@ -447,7 +447,8 @@ async function refreshSelfTests() {
       let logRes = await runCommand(["smartctl", "-a", path], { superuser: "require" });
       const output = (logRes.stdout || "") + "\n" + (logRes.error || "");
       
-      const isSmartctlFailed = logRes.code !== 0 || !/Test_Description|LBA_of/i.test(output);
+      const isSmartctlFailed = /Read Self-test Log failed|Device does not support/i.test(output) ||
+                               (logRes.code !== 0 && !/No self-test|Test_Description|LBA_of/i.test(output));
       
       if (isSmartctlFailed && disk.startsWith("nvme")) {
         // Fall back to nvme-cli to query self-test log in JSON format
