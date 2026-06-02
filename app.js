@@ -496,15 +496,22 @@ function renderAttrsTable(attrs) {
   if (!attrs.length) return "<div class=\"text-muted mt-2\">No SMART data</div>";
   const rows = attrs
     .map(
-      (a) => `
-      <tr>
-        <td>${a.id}</td>
-        <td>${a.name}</td>
-        <td>${a.value}</td>
-        <td>${a.worst}</td>
-        <td>${a.thresh}</td>
-        <td>${escapeHtml(a.raw)}</td>
-      </tr>`
+      (a) => {
+        const lookupKey = a.name.toLowerCase();
+        const desc = smartDescriptions[lookupKey] || "";
+        const tooltipHtml = desc 
+          ? ` <span class="text-muted" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeHtml(desc)}">ⓘ</span>`
+          : "";
+        return `
+        <tr>
+          <td>${a.id}</td>
+          <td>${a.name}${tooltipHtml}</td>
+          <td>${a.value}</td>
+          <td>${a.worst}</td>
+          <td>${a.thresh}</td>
+          <td>${escapeHtml(a.raw)}</td>
+        </tr>`;
+      }
     )
     .join("");
   return `
