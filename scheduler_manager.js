@@ -43,6 +43,7 @@ for DEV in \$DISKS; do
   if echo "\$HEALTH_OUT" | grep -qiE "FAIL|FAILED"; then
     ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: SMART Health FAILED!"
     echo "SMART Health FAILED on \$PATH_DEV"
+    logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} SMART Health FAILED!"
   fi
 
   # 2. Check SATA attributes
@@ -54,6 +55,7 @@ for DEV in \$DISKS; do
     if [ ! -z "\$REALLOC" ] && [ "\$REALLOC" -gt 0 ] 2>/dev/null; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Reallocated Sectors = \${REALLOC}"
       echo "Reallocated Sectors = \$REALLOC on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} has Reallocated Sectors = \${REALLOC}"
     fi
 
     # ID 197: Current Pending Sector Count
@@ -61,6 +63,7 @@ for DEV in \$DISKS; do
     if [ ! -z "\$PENDING" ] && [ "\$PENDING" -gt 0 ] 2>/dev/null; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Current Pending Sectors = \${PENDING}"
       echo "Pending Sectors = \$PENDING on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} has Current Pending Sectors = \${PENDING}"
     fi
 
     # ID 198: Offline Uncorrectable
@@ -68,6 +71,7 @@ for DEV in \$DISKS; do
     if [ ! -z "\$OFFLINE" ] && [ "\$OFFLINE" -gt 0 ] 2>/dev/null; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Offline Uncorrectable Sectors = \${OFFLINE}"
       echo "Offline Uncorrectable = \$OFFLINE on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} has Offline Uncorrectable Sectors = \${OFFLINE}"
     fi
 
     # ID 199: UDMA CRC Error Count
@@ -75,6 +79,7 @@ for DEV in \$DISKS; do
     if [ ! -z "\$CRC" ] && [ "\$CRC" -gt 0 ] 2>/dev/null; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: UDMA CRC Errors = \${CRC}"
       echo "UDMA CRC Errors = \$CRC on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} has UDMA CRC Errors = \${CRC}"
     fi
   fi
 
@@ -87,6 +92,7 @@ for DEV in \$DISKS; do
     if [ ! -z "\$CRIT_WARN" ] && [ "\$CRIT_WARN" != "0x00" ]; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: NVMe Critical Warning = \${CRIT_WARN}"
       echo "NVMe Critical Warning = \$CRIT_WARN on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} NVMe Critical Warning = \${CRIT_WARN}"
     fi
     
     # Media and Data Integrity Errors
@@ -95,23 +101,26 @@ for DEV in \$DISKS; do
     if [ ! -z "\$MEDIA_ERR_CLEAN" ] && [ "\$MEDIA_ERR_CLEAN" -gt 0 ] 2>/dev/null; then
       ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: NVMe Media and Data Integrity Errors = \${MEDIA_ERR}"
       echo "NVMe Media Errors = \$MEDIA_ERR on \$PATH_DEV"
+      logger -t disk-health -p daemon.err "Disk Health Alert: \${PATH_DEV} NVMe Media and Data Integrity Errors = \${MEDIA_ERR}"
     fi
   fi
 done
 
 if [ -z "\$ERRORS" ]; then
   echo "All disks healthy. No errors detected."
-fi
-
-# Send Telegram notification if enabled
-if [ ! -z "\$ERRORS" ] && [ "\$TELEGRAM_ENABLED" = "1" ] && [ ! -z "\$TELEGRAM_TOKEN" ] && [ ! -z "\$TELEGRAM_CHAT_ID" ]; then
-  HOSTNAME=\$(hostname)
-  MSG="⚠️ *Disk Health Warning on \${HOSTNAME}* ⚠️\\n\${ERRORS}"
-  echo "Sending Telegram alert..."
-  curl -s -X POST "https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage" \\
-    -d "chat_id=\${TELEGRAM_CHAT_ID}" \\
-    --data-urlencode "text=\$(echo -e "\${MSG}")" \\
-    -d "parse_mode=Markdown" >/dev/null
+  exit 0
+else
+  # Send Telegram notification if enabled
+  if [ "\$TELEGRAM_ENABLED" = "1" ] && [ ! -z "\$TELEGRAM_TOKEN" ] && [ ! -z "\$TELEGRAM_CHAT_ID" ]; then
+    HOSTNAME=\$(hostname)
+    MSG="⚠️ *Disk Health Warning on \${HOSTNAME}* ⚠️\\n\${ERRORS}"
+    echo "Sending Telegram alert..."
+    curl -s -X POST "https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage" \\
+      -d "chat_id=\${TELEGRAM_CHAT_ID}" \\
+      --data-urlencode "text=\$(echo -e "\${MSG}")" \\
+      -d "parse_mode=Markdown" >/dev/null
+  fi
+  exit 1
 fi
 `;
 }
