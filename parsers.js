@@ -254,18 +254,29 @@ export function parseNvmeCliSelfTest(jsonText) {
     const data = JSON.parse(jsonText);
     let inProgress = null;
     
-    // current_operation: 0 = no active test, 1 = Short in progress, 2 = Extended in progress, etc.
-    if (data.current_operation > 0) {
-      const comp = data.completion !== undefined ? data.completion : (data.completion_percentage || 0);
+    const currentOp = data.current_operation !== undefined ? data.current_operation : data["Current Device Self-Test Operation"];
+    const comp = data.completion !== undefined ? data.completion : (data.completion_percentage !== undefined ? data.completion_percentage : data["Current Device Self-Test Completion"]);
+    
+    if (currentOp !== undefined && currentOp > 0) {
       inProgress = {
         status: "In Progress",
-        remaining: `${100 - comp}%`
+        remaining: `${100 - (comp || 0)}%`
       };
     }
     
-    const entries = data.result_entries || data.results || [];
-    const results = entries.map((entry, idx) => {
-      const resultCode = (entry.operation_result !== undefined ? entry.operation_result : (entry.result !== undefined ? entry.result : 0)) & 0xF;
+    const entries = data.result_entries || data.results || data["List of Valid Reports"] || [];
+    const results = [];
+    
+    entries.forEach((entry) => {
+      let rawResult = entry.operation_result !== undefined ? entry.operation_result : 
+                      (entry.result !== undefined ? entry.result : entry["Self test result"]);
+      
+      if (rawResult === undefined) return;
+      
+      const resultCode = rawResult & 0xF;
+      // 15 (0xF) means the self-test entry is empty/not used, so skip it.
+      if (resultCode === 15) return;
+      
       let status = "Unknown status";
       switch (resultCode) {
         case 0: status = "Completed without error"; break;
@@ -280,25 +291,30 @@ export function parseNvmeCliSelfTest(jsonText) {
         default: status = `Completed with error code ${resultCode}`;
       }
       
-      const typeCode = entry.self_test_code !== undefined ? entry.self_test_code : entry.code;
+      const typeCode = entry.self_test_code !== undefined ? entry.self_test_code : 
+                       (entry.code !== undefined ? entry.code : entry["Self test code"]);
       let description = "Unknown test";
       if (typeCode === 1) description = "Short device self-test";
       else if (typeCode === 2) description = "Extended device self-test";
       
-      return {
-        num: String(idx + 1),
+      let poh = entry.power_on_hours !== undefined ? entry.power_on_hours : entry["Power on hours"];
+      let lba = entry.failing_lba !== undefined ? entry.failing_lba : 
+                (entry["Failing LBA"] !== undefined ? entry["Failing LBA"] : entry["Failing lba"]);
+      
+      results.push({
+        num: String(results.length + 1),
         description,
         status,
         remaining: "00%",
-        lifetime: String(entry.power_on_hours !== undefined ? entry.power_on_hours : "-"),
-        lba: entry.failing_lba !== undefined ? String(entry.failing_lba) : "-"
-      };
+        lifetime: poh !== undefined ? String(poh) : "-",
+        lba: lba !== undefined ? String(lba) : "-"
+      });
     });
     
     return {
       inProgress,
       history: results,
-      powerOnHours: null // nvme-cli result has power_on_hours for each entry
+      powerOnHours: null
     };
   } catch (err) {
     return null;
