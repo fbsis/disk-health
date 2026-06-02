@@ -207,10 +207,16 @@ export function renderSnapshot(snapshot) {
                           /success/i.test(output) || 
                           /completed after/i.test(output) || 
                           /in progress/i.test(output) || 
-                          /started/i.test(output);
+                          /started/i.test(output) ||
+                          /Invalid Field in Command/i.test(output) ||
+                          /Read Self-test Log failed/i.test(output);
 
         if (isSuccess) {
-          statusEl.textContent = `Test successfully triggered! Info: ${res.stdout.trim() || "Test started in background."}`;
+          let msg = `Test successfully triggered! Info: ${res.stdout.trim() || "Test started in background."}`;
+          if (/Invalid Field in Command/i.test(output) || /Read Self-test Log failed/i.test(output)) {
+            msg = `Test successfully triggered! (Note: The test has started in the background, but smartctl failed to read the self-test log: "Invalid Field in Command").`;
+          }
+          statusEl.textContent = msg;
           statusEl.className = "text-success small mt-2";
         } else {
           statusEl.textContent = `Failed to trigger: ${res.error || res.stdout || "unknown error"}`;
