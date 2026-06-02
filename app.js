@@ -14,30 +14,14 @@ import {
 } from "./ui_renderer.js";
 
 const btnCollect = document.getElementById("btn-collect");
-const btnRefresh = document.getElementById("btn-refresh");
+const btnSettings = document.getElementById("btn-settings");
 const btnCompare = document.getElementById("btn-compare");
 const compareA = document.getElementById("compare-a");
 const compareB = document.getElementById("compare-b");
 const compareResult = document.getElementById("compare-result");
 
 btnCollect.addEventListener("click", async () => {
-  btnCollect.disabled = true;
-  btnCollect.textContent = "Collecting...";
-  try {
-    const data = await collectSnapshot();
-    renderSnapshot(data);
-    await saveSnapshot(data);
-    await refreshHistory();
-  } catch (err) {
-    alert(err.message || err);
-  } finally {
-    btnCollect.disabled = false;
-    btnCollect.textContent = "Collect Now";
-  }
-});
-
-btnRefresh.addEventListener("click", async () => {
-  await refreshHistory();
+  await triggerCollect();
 });
 
 btnCompare.addEventListener("click", () => {
@@ -96,6 +80,22 @@ btnCompare.addEventListener("click", () => {
     disks
   });
 });
+
+async function triggerCollect() {
+  btnCollect.disabled = true;
+  btnCollect.textContent = "Collecting...";
+  try {
+    const data = await collectSnapshot();
+    renderSnapshot(data);
+    await saveSnapshot(data);
+    await refreshHistory();
+  } catch (err) {
+    alert(err.message || err);
+  } finally {
+    btnCollect.disabled = false;
+    btnCollect.textContent = "Collect Now";
+  }
+}
 
 async function refreshHistory() {
   const snaps = await loadSnapshots(200);
