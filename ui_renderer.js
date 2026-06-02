@@ -61,7 +61,12 @@ export function renderSnapshot(snapshot) {
     tabBtn.dataset.bsTarget = `#${paneId}`;
     tabBtn.ariaControls = paneId;
     tabBtn.ariaSelected = idx === 0 ? "true" : "false";
-    tabBtn.textContent = disk.path || disk.name || `Disk ${idx + 1}`;
+    tabBtn.innerHTML = `${disk.path || disk.name} <span id="tab-power-dot-${slug}" class="spinner-grow spinner-grow-sm text-secondary ms-1" role="status" style="width: 8px; height: 8px; vertical-align: middle;"></span>`;
+    
+    // Store metadata attributes for real-time power polling
+    tabBtn.dataset.powerPollSlug = slug;
+    tabBtn.dataset.powerPollPath = disk.path;
+    tabBtn.dataset.powerPollKind = disk.kind;
 
     tabItem.appendChild(tabBtn);
     tabs.appendChild(tabItem);
@@ -87,7 +92,10 @@ export function renderSnapshot(snapshot) {
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <h3 class="h5 mb-1">${disk.path}</h3>
+              <h3 class="h5 mb-1">
+                ${disk.path}
+                <span id="power-badge-${slug}" class="badge bg-secondary text-uppercase ms-2" style="font-size: 0.7rem; vertical-align: middle;">Querying...</span>
+              </h3>
               <div class="disk-meta">${disk.model || "Unknown Model"} • ${disk.size || ""} • ${kindLabel}</div>
             </div>
             <span class="badge-health ${healthClass}">${health}</span>

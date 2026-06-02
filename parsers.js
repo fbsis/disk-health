@@ -320,3 +320,16 @@ export function parseNvmeCliSelfTest(jsonText) {
     return null;
   }
 }
+
+export function parseHdparmPowerState(stdout) {
+  if (!stdout) return "unknown";
+  const lower = stdout.toLowerCase();
+  if (lower.includes("active/idle")) {
+    return "active";
+  } else if (lower.includes("standby")) {
+    return "standby";
+  } else if (lower.includes("sleeping") || lower.includes("sleep")) {
+    return "sleep";
+  }
+  return "unknown";
+}

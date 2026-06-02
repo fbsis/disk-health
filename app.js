@@ -1,4 +1,5 @@
-import { collectSnapshot } from "./data_collector.js";
+import { collectSnapshot, runCommand } from "./data_collector.js";
+import { parseHdparmPowerState } from "./parsers.js";
 import { 
   setSnapshotFilePath, 
   saveSnapshot, 
@@ -87,6 +88,7 @@ async function triggerCollect() {
   try {
     const data = await collectSnapshot();
     renderSnapshot(data);
+    startPowerStatusPolling();
     await saveSnapshot(data);
     await refreshHistory();
   } catch (err) {
@@ -105,7 +107,101 @@ async function refreshHistory() {
   
   if (snaps.length > 0) {
     renderSnapshot(snaps[0]);
+    startPowerStatusPolling();
   }
+}
+
+let powerPollInterval = null;
+let isPowerPolling = false;
+
+async function pollDiskPowerStates() {
+  if (isPowerPolling) return;
+  
+  const tabButtons = document.querySelectorAll("[data-power-poll-slug]");
+  if (tabButtons.length === 0) return;
+  
+  isPowerPolling = true;
+  
+  try {
+    for (const btn of tabButtons) {
+      const slug = btn.dataset.powerPollSlug;
+      const path = btn.dataset.powerPollPath;
+      const kind = btn.dataset.powerPollKind;
+      
+      const badge = document.getElementById(`power-badge-${slug}`);
+      const dot = document.getElementById(`tab-power-dot-${slug}`);
+      
+      if (kind === "nvme") {
+        if (dot) {
+          dot.className = "spinner-grow spinner-grow-sm text-info ms-1";
+          dot.style.animation = "none";
+        }
+        if (badge) {
+          badge.className = "badge bg-info text-uppercase ms-2";
+          badge.textContent = "Active";
+          badge.title = "NVMe SSD (Ready)";
+        }
+        continue;
+      }
+      
+      const res = await runCommand(["hdparm", "-C", path], { superuser: "require" });
+      const state = parseHdparmPowerState(res.stdout);
+      
+      if (state === "active") {
+        if (dot) {
+          dot.className = "spinner-grow spinner-grow-sm text-success ms-1";
+          dot.style.animation = "none";
+        }
+        if (badge) {
+          badge.className = "badge bg-success text-uppercase ms-2";
+          badge.textContent = "Active";
+          badge.title = "Drive platters are spinning (Active/Idle)";
+        }
+      } else if (state === "standby") {
+        if (dot) {
+          dot.className = "spinner-grow spinner-grow-sm text-warning ms-1";
+          dot.style.animation = "none";
+        }
+        if (badge) {
+          badge.className = "badge bg-warning text-dark text-uppercase ms-2";
+          badge.textContent = "Standby";
+          badge.title = "Drive has spun down (Low power standby mode)";
+        }
+      } else if (state === "sleep") {
+        if (dot) {
+          dot.className = "spinner-grow spinner-grow-sm text-secondary ms-1";
+          dot.style.animation = "none";
+        }
+        if (badge) {
+          badge.className = "badge bg-secondary text-uppercase ms-2";
+          badge.textContent = "Sleeping";
+          badge.title = "Drive is in deep sleep mode";
+        }
+      } else {
+        if (dot) {
+          dot.className = "spinner-grow spinner-grow-sm text-muted ms-1";
+          dot.style.animation = "none";
+        }
+        if (badge) {
+          badge.className = "badge bg-light text-muted text-uppercase border ms-2";
+          badge.textContent = "Unknown";
+          badge.title = res.error || "Failed to query state via hdparm";
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error polling disk power states:", err);
+  } finally {
+    isPowerPolling = false;
+  }
+}
+
+function startPowerStatusPolling() {
+  if (powerPollInterval) {
+    clearInterval(powerPollInterval);
+  }
+  pollDiskPowerStates();
+  powerPollInterval = setInterval(pollDiskPowerStates, 5000);
 }
 
 async function init() {
