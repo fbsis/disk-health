@@ -1,44 +1,65 @@
-# Disk Health Remote
+# Disk Health - Cockpit Extension
 
-UI em Node.js + Bootstrap para coletar saude de discos via SSH e salvar historico em JSONL/CSV.
+A native extension for the **Cockpit Project** (https://cockpit-project.org) that provides a user-friendly UI to monitor disk health, SMART attributes, partition space usage, and zpools. It runs on the local server where Cockpit is installed, utilizing native browser APIs to interact with the host system.
 
-## Requisitos no servidor remoto
+![Disk Health Dashboard](https://raw.githubusercontent.com/cockpit-project/starter-kit/main/screenshot.png) *(Placeholder)*
 
-- `lsblk`
-- `smartctl` (smartmontools)
-- Permissao para rodar `smartctl` (root ou sudo sem senha)
+## Features
 
-## Configuracao
+- **Local System Collection**: Executes commands locally using `cockpit.spawn` (no Node.js backend or SSH connection required).
+- **SMART Health Check**: Retrieves and parses `smartctl` attributes for ATA/SATA and NVMe drives with secure elevation of privileges.
+- **Filesystem & ZFS Pool Usage**: Shows total and available space across disk partitions and active ZFS pools (`zpools`).
+- **History Tracker**: Persists snapshots to a local database file (`~/.local/share/disk-health/snapshots.jsonl`) to show temperature and critical attribute timelines.
+- **Snapshot Comparison**: Compares SMART parameters of disks across two historical points in time.
+- **Offline Compatibility**: All CSS and JS libraries (Bootstrap, Chart.js) are packed locally for environments without Internet access.
 
-1. Copie `.env.example` para `.env` e edite.
-2. Instale deps e rode:
+## Requirements
 
+The extension triggers the following host commands. Ensure they are installed on the server:
+
+- `lsblk` (standard in almost all Linux distributions)
+- `smartctl` (provided by `smartmontools`)
+- ZFS utilities (optional, required only if you want to monitor `zpools`)
+
+*Note: The user accessing Cockpit needs permissions to run `smartctl` (typically as a superuser/root). Cockpit will prompt for authorization when administrative operations are requested.*
+
+## Installation
+
+### 1. Install Cockpit on your Host
+Make sure Cockpit is installed and running on your machine:
+*   **Debian/Ubuntu:**
+    ```bash
+    sudo apt update
+    sudo apt install cockpit
+    ```
+*   **Fedora/RHEL/CentOS:**
+    ```bash
+    sudo dnf install cockpit
+    sudo systemctl enable --now cockpit.socket
+    ```
+
+### 2. Install the Extension
+
+#### Development / User-specific Mode (Recommended for testing)
+Install it only for the currently logged-in user:
 ```bash
-npm install
-npm start
+# Create the local cockpit share directory if it doesn't exist
+mkdir -p ~/.local/share/cockpit
+
+# Create a symlink to this project directory
+ln -s /Users/felipebraga/dev/personal/disk-health-remote ~/.local/share/cockpit/disk-health-remote
 ```
+*Any changes made in this repository will instantly be loaded when you refresh the Cockpit interface (F5).*
 
-Acesse: `http://localhost:3000`.
-
-### Agendamento
-
-Habilite no `.env`:
-
-```
-SCHEDULE_ENABLED=true
-SCHEDULE_DAILY_TIME=14:00
-```
-
-## Docker
-
+#### Production / System-wide Mode
+Install it globally for all system users:
 ```bash
-docker build -t disk-health-remote .
-docker run --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data disk-health-remote
+sudo cp -r /Users/felipebraga/dev/personal/disk-health-remote /usr/share/cockpit/disk-health-remote
 ```
 
-## Historico
-
-- JSONL: `data/snapshots.jsonl`
-- CSV: `data/snapshots.csv`
-
-Cada coleta cria um snapshot com os dados de todos os discos.
+### 3. Usage
+1. Open your web browser and go to `https://<your-server-ip>:9090`.
+2. Login with your standard Linux system credentials.
+3. Select **"Disk Health"** in the sidebar.
+4. Click **"Collect Now"** to execute the system commands and analyze the health of the drives.
+5. Authorize administrative access when Cockpit asks for permission.
