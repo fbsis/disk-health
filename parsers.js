@@ -235,6 +235,61 @@ export function parseSelfTests(stdout) {
 
   return {
     inProgress,
-    history: tests
+    history: tests,
+    powerOnHours
   };
+}
+
+export function parseNvmeCliSelfTest(jsonText) {
+  try {
+    const data = JSON.parse(jsonText);
+    let inProgress = null;
+    
+    // current_operation: 0 = no active test, 1 = Short in progress, 2 = Extended in progress, etc.
+    if (data.current_operation > 0) {
+      inProgress = {
+        status: "In Progress",
+        remaining: `${100 - (data.completion_percentage || 0)}%`
+      };
+    }
+    
+    const results = (data.result_entries || []).map((entry, idx) => {
+      const resultCode = entry.operation_result & 0xF;
+      let status = "Unknown status";
+      switch (resultCode) {
+        case 0: status = "Completed without error"; break;
+        case 1: status = "Aborted by Device Self-test command"; break;
+        case 2: status = "Aborted by a Reset"; break;
+        case 3: status = "Aborted due to electrical failure"; break;
+        case 4: status = "Aborted due to fatal error"; break;
+        case 5: status = "Aborted due to read error"; break;
+        case 6: status = "Aborted due to write error"; break;
+        case 7: status = "Aborted due to unknown error"; break;
+        case 8: status = "Completed with error"; break;
+        default: status = `Completed with error code ${resultCode}`;
+      }
+      
+      const typeCode = entry.self_test_code;
+      let description = "Unknown test";
+      if (typeCode === 1) description = "Short device self-test";
+      else if (typeCode === 2) description = "Extended device self-test";
+      
+      return {
+        num: String(idx + 1),
+        description,
+        status,
+        remaining: "00%",
+        lifetime: String(entry.power_on_hours || "-"),
+        lba: entry.failing_lba !== undefined ? String(entry.failing_lba) : "-"
+      };
+    });
+    
+    return {
+      inProgress,
+      history: results,
+      powerOnHours: null // nvme-cli result has power_on_hours for each entry
+    };
+  } catch (err) {
+    return null;
+  }
 }
