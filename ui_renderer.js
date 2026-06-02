@@ -201,8 +201,16 @@ export function renderSnapshot(snapshot) {
       try {
         const { runCommand } = await import("./data_collector.js");
         const res = await runCommand(["smartctl", "-t", testType, diskPath], { superuser: "require" });
-        if (res.code === 0) {
-          statusEl.textContent = `Test successfully triggered! Info: ${res.stdout.trim()}`;
+        
+        const output = (res.stdout || "") + "\n" + (res.error || "");
+        const isSuccess = res.code === 0 || 
+                          /success/i.test(output) || 
+                          /completed after/i.test(output) || 
+                          /in progress/i.test(output) || 
+                          /started/i.test(output);
+
+        if (isSuccess) {
+          statusEl.textContent = `Test successfully triggered! Info: ${res.stdout.trim() || "Test started in background."}`;
           statusEl.className = "text-success small mt-2";
         } else {
           statusEl.textContent = `Failed to trigger: ${res.error || res.stdout || "unknown error"}`;

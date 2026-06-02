@@ -1,5 +1,5 @@
 import { runCommand } from "./data_collector.js";
-import { parseSelfTests } from "./parsers.js";
+import { parseSelfTests, parseNvmeCliSelfTest } from "./parsers.js";
 
 function generateCheckScriptContent() {
   return `#!/usr/bin/env bash
@@ -384,8 +384,43 @@ async function refreshSelfTests() {
 
     for (const disk of disks) {
       const path = `/dev/${disk}`;
-      const logRes = await runCommand(["smartctl", "-l", "self-test", path], { superuser: "require" });
-      const parsed = parseSelfTests(logRes.stdout);
+      
+      let parsed = null;
+      let logRes = await runCommand(["smartctl", "-a", path], { superuser: "require" });
+      const output = (logRes.stdout || "") + "\n" + (logRes.error || "");
+      
+      const isSmartctlFailed = logRes.code !== 0 || !/Test_Description|LBA_of/i.test(output);
+      
+      if (isSmartctlFailed && disk.startsWith("nvme")) {
+        // Fall back to nvme-cli to query self-test log in JSON format
+        const nvmeRes = await runCommand(["nvme", "self-test-log", path, "-o", "json"], { superuser: "require" });
+        if (nvmeRes.code === 0 && nvmeRes.stdout) {
+          parsed = parseNvmeCliSelfTest(nvmeRes.stdout);
+        }
+      }
+      
+      if (!parsed) {
+        parsed = parseSelfTests(logRes.stdout);
+      }
+
+      // If both smartctl and nvme-cli failed to get self-tests status, render warning
+      if (!parsed || (parsed.history.length === 0 && !parsed.inProgress && isSmartctlFailed)) {
+        html += `
+          <div class="card mb-4 border shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+              <h6 class="mb-0 fw-bold">${path}</h6>
+              <span class="badge bg-secondary text-uppercase">${disk.startsWith("nvme") ? "NVMe" : "SATA"}</span>
+            </div>
+            <div class="card-body p-3">
+              <div class="text-warning small">
+                ⚠️ SMART self-test log is not supported or failed to read on this device (e.g. Invalid Field in Command). 
+                The background test may still be running, but its history log cannot be read by the tools.
+              </div>
+            </div>
+          </div>
+        `;
+        continue;
+      }
 
       // Render Active Test Progress if in progress
       let activeHtml = "";
@@ -418,13 +453,30 @@ async function refreshSelfTests() {
           } else if (statusText.includes("fail") || statusText.includes("fatal") || statusText.includes("error")) {
             badgeClass = "bg-danger";
           }
+
+          // Calculate time elapsed since completed if powerOnHours is parsed
+          let timeAgo = "";
+          if (parsed.powerOnHours !== null && t.lifetime !== "-") {
+            const entryLifetime = parseInt(t.lifetime, 10);
+            if (!isNaN(entryLifetime)) {
+              const diff = parsed.powerOnHours - entryLifetime;
+              if (diff === 0) {
+                timeAgo = " (just now)";
+              } else if (diff === 1) {
+                timeAgo = " (~1 hour ago)";
+              } else {
+                timeAgo = ` (~${diff} hours ago)`;
+              }
+            }
+          }
+
           return `
             <tr>
               <td class="fw-medium">#${t.num}</td>
               <td>${t.description}</td>
               <td><span class="badge ${badgeClass}">${t.status}</span></td>
               <td>${t.remaining}</td>
-              <td>${t.lifetime} hrs</td>
+              <td>${t.lifetime} hrs${timeAgo}</td>
               <td><code>${t.lba}</code></td>
             </tr>
           `;
