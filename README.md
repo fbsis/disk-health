@@ -2,7 +2,11 @@
 
 A native extension for the **Cockpit Project** (https://cockpit-project.org) that provides a user-friendly UI to monitor disk health, SMART attributes, partition space usage, and zpools. It runs on the local server where Cockpit is installed, utilizing native browser APIs to interact with the host system.
 
-![Disk Health Dashboard](https://raw.githubusercontent.com/cockpit-project/starter-kit/main/screenshot.png) *(Placeholder)*
+<img width="1039" height="963" alt="image" src="https://github.com/user-attachments/assets/e1aeccec-683e-4bc1-99b2-2fd3d4982352" />
+
+<img width="1039" height="963" alt="image" src="https://github.com/user-attachments/assets/ccaf6cfd-a339-40f4-a80f-2fd7347d8a29" />
+
+<img width="1039" height="963" alt="image" src="https://github.com/user-attachments/assets/3119963e-7906-455d-94d9-7aad32ca1444" />
 
 ## Features
 
