@@ -131,6 +131,7 @@ export async function loadConfig() {
     enabled: false,
     testType: "none",
     frequency: "daily",
+    checkTime: "03:00",
     telegramEnabled: false,
     telegramToken: "",
     telegramChatId: ""
@@ -145,6 +146,7 @@ export async function loadConfig() {
         if (key === "ENABLED") config.enabled = val === "1";
         if (key === "TEST_TYPE") config.testType = val;
         if (key === "FREQUENCY") config.frequency = val;
+        if (key === "CHECK_TIME") config.checkTime = val;
         if (key === "TELEGRAM_ENABLED") config.telegramEnabled = val === "1";
         if (key === "TELEGRAM_TOKEN") config.telegramToken = val;
         if (key === "TELEGRAM_CHAT_ID") config.telegramChatId = val;
@@ -169,6 +171,7 @@ export function setupScheduler() {
 
   const settingsTestType = document.getElementById("settings-test-type");
   const settingsFrequency = document.getElementById("settings-frequency");
+  const settingsTime = document.getElementById("settings-time");
   const settingsTgToken = document.getElementById("settings-tg-token");
   const settingsTgChatId = document.getElementById("settings-tg-chat-id");
 
@@ -225,6 +228,7 @@ export function setupScheduler() {
       schedEnabledCheck.checked = config.enabled;
       settingsTestType.value = config.testType;
       settingsFrequency.value = config.frequency;
+      if (settingsTime) settingsTime.value = config.checkTime || "03:00";
       tgEnabledCheck.checked = config.telegramEnabled;
       settingsTgToken.value = config.telegramToken;
       settingsTgChatId.value = config.telegramChatId;
@@ -240,6 +244,7 @@ export function setupScheduler() {
     const enabled = schedEnabledCheck.checked ? "1" : "0";
     const testType = settingsTestType.value;
     const frequency = settingsFrequency.value;
+    const checkTime = settingsTime ? settingsTime.value : "03:00";
     const tgEnabled = tgEnabledCheck.checked ? "1" : "0";
     const tgToken = settingsTgToken.value.trim();
     const tgChatId = settingsTgChatId.value.trim();
@@ -248,6 +253,7 @@ export function setupScheduler() {
       `ENABLED=${enabled}`,
       `TEST_TYPE="${testType}"`,
       `FREQUENCY="${frequency}"`,
+      `CHECK_TIME="${checkTime}"`,
       `TELEGRAM_ENABLED=${tgEnabled}`,
       `TELEGRAM_TOKEN="${tgToken}"`,
       `TELEGRAM_CHAT_ID="${tgChatId}"`
@@ -302,11 +308,16 @@ ExecStart=/usr/local/bin/disk-health-check.sh
     }
 
     // Determine OnCalendar schedule
-    let onCalendar = "*-*-* 03:00:00"; // daily default
+    const timeParts = checkTime.split(":");
+    const hour = timeParts[0] || "03";
+    const minute = timeParts[1] || "00";
+    const formattedTime = `${hour}:${minute}:00`;
+
+    let onCalendar = `*-*-* ${formattedTime}`; // daily default
     if (frequency === "weekly") {
-      onCalendar = "Sun *-*-* 03:00:00";
+      onCalendar = `Sun *-*-* ${formattedTime}`;
     } else if (frequency === "monthly") {
-      onCalendar = "*-*-01 03:00:00";
+      onCalendar = `*-*-01 ${formattedTime}`;
     }
 
     // Save Systemd Timer File

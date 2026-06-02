@@ -148,7 +148,7 @@
                   </div>
 
                   <div id="sched-options-group" class="row g-3 mb-4 d-none">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                       <label for="settings-test-type" class="form-label small fw-semibold text-muted">SMART Test Type</label>
                       <select id="settings-test-type" class="form-select">
                         <option value="none">None (Read SMART Attributes only)</option>
@@ -157,13 +157,17 @@
                         <option value="offline">Immediate Offline Test</option>
                       </select>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                       <label for="settings-frequency" class="form-label small fw-semibold text-muted">Check Frequency</label>
                       <select id="settings-frequency" class="form-select">
-                        <option value="daily">Daily (at 3:00 AM)</option>
-                        <option value="weekly">Weekly (Sundays at 3:00 AM)</option>
-                        <option value="monthly">Monthly (1st of Month at 3:00 AM)</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly (on Sundays)</option>
+                        <option value="monthly">Monthly (on the 1st)</option>
                       </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="settings-time" class="form-label small fw-semibold text-muted">Execution Time</label>
+                      <input type="time" id="settings-time" class="form-control" value="03:00">
                     </div>
                   </div>
 
