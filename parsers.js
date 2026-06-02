@@ -173,7 +173,7 @@ function toCamel(text) {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+(.)/g, (_, chr) => chr.toUpperCase())
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[^a-zA-Z0-9]/g, "");
 }
 
 function escapeRegex(text) {
