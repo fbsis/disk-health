@@ -8,6 +8,15 @@ A native extension for the **Cockpit Project** (https://cockpit-project.org) tha
 
 <img width="1039" height="963" alt="image" src="https://github.com/user-attachments/assets/3119963e-7906-455d-94d9-7aad32ca1444" />
 
+
+
+https://github.com/user-attachments/assets/129e0eec-dc84-4f6c-a97b-67d3da394497
+
+
+
+
+
+
 ## Features
 
 - **Local System Collection**: Executes commands locally using `cockpit.spawn` (no Node.js backend or SSH connection required).
