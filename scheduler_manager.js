@@ -255,6 +255,64 @@ export function setupScheduler() {
     if (chmodRes.code !== 0) {
       throw new Error(`Failed to make check script executable: ${chmodRes.error || "unknown error"}`);
     }
+
+    // Save Systemd Service File
+    const serviceContent = `[Unit]
+Description=Disk Health Background Check Service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/disk-health-check.sh
+`;
+    const serviceRes = await runCommand(["tee", "/etc/systemd/system/disk-health-check.service"], {
+      superuser: "require",
+      input: serviceContent
+    });
+    if (serviceRes.code !== 0) {
+      throw new Error(`Failed to write systemd service file: ${serviceRes.error || "unknown error"}`);
+    }
+
+    // Determine OnCalendar schedule
+    let onCalendar = "*-*-* 03:00:00"; // daily default
+    if (frequency === "weekly") {
+      onCalendar = "Sun *-*-* 03:00:00";
+    } else if (frequency === "monthly") {
+      onCalendar = "*-*-01 03:00:00";
+    }
+
+    // Save Systemd Timer File
+    const timerContent = `[Unit]
+Description=Disk Health Background Check Timer
+
+[Timer]
+OnCalendar=${onCalendar}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`;
+    const timerRes = await runCommand(["tee", "/etc/systemd/system/disk-health-check.timer"], {
+      superuser: "require",
+      input: timerContent
+    });
+    if (timerRes.code !== 0) {
+      throw new Error(`Failed to write systemd timer file: ${timerRes.error || "unknown error"}`);
+    }
+
+    // Manage timer status
+    if (enabled === "1") {
+      // Reload daemon and enable timer
+      await runCommand(["systemctl", "daemon-reload"], { superuser: "require" });
+      const enableRes = await runCommand(["systemctl", "enable", "--now", "disk-health-check.timer"], { superuser: "require" });
+      if (enableRes.code !== 0) {
+        throw new Error(`Failed to enable systemd timer: ${enableRes.error || "unknown error"}`);
+      }
+    } else {
+      // Disable timer and reload daemon
+      await runCommand(["systemctl", "disable", "--now", "disk-health-check.timer"], { superuser: "require" });
+      await runCommand(["systemctl", "daemon-reload"], { superuser: "require" });
+    }
   }
 
   // Save Config handler
