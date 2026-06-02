@@ -16,6 +16,7 @@ import {
 const btnCollect = document.getElementById("btn-collect");
 const btnSettings = document.getElementById("btn-settings");
 const btnCompare = document.getElementById("btn-compare");
+const btnRunCheck = document.getElementById("btn-run-check");
 const compareA = document.getElementById("compare-a");
 const compareB = document.getElementById("compare-b");
 const compareResult = document.getElementById("compare-result");
@@ -106,6 +107,121 @@ async function populateSettingsModal() {
   }
 }
 
+function generateCheckScriptContent() {
+  return `#!/usr/bin/env bash
+
+# Load configuration
+CONFIG_FILE="/etc/disk-health-config.env"
+if [ ! -f "\$CONFIG_FILE" ]; then
+  echo "Configuration file \$CONFIG_FILE not found."
+  exit 1
+fi
+source "\$CONFIG_FILE"
+
+if [ "\$ENABLED" != "1" ]; then
+  echo "Monitoring is disabled in configuration."
+  exit 0
+fi
+
+# Get list of physical disks
+DISKS=\$(lsblk -dno name,type | awk '\$2=="disk" {print \$1}' | grep -v '^zd' | grep -v '^loop')
+
+ERRORS=""
+
+for DEV in \$DISKS; do
+  PATH_DEV="/dev/\$DEV"
+  echo "Checking \$PATH_DEV..."
+
+  # Trigger SMART self-test if configured
+  if [ "\$TEST_TYPE" = "short" ]; then
+    echo "Triggering short self-test for \$PATH_DEV"
+    smartctl -t short "\$PATH_DEV" >/dev/null 2>&1
+  elif [ "\$TEST_TYPE" = "long" ]; then
+    echo "Triggering long self-test for \$PATH_DEV"
+    smartctl -t long "\$PATH_DEV" >/dev/null 2>&1
+  elif [ "\$TEST_TYPE" = "offline" ]; then
+    echo "Triggering offline self-test for \$PATH_DEV"
+    smartctl -t offline "\$PATH_DEV" >/dev/null 2>&1
+  fi
+
+  # 1. Check overall SMART health
+  HEALTH_OUT=\$(smartctl -H "\$PATH_DEV" 2>/dev/null)
+  if echo "\$HEALTH_OUT" | grep -qiE "FAIL|FAILED"; then
+    ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: SMART Health FAILED!"
+    echo "SMART Health FAILED on \$PATH_DEV"
+  fi
+
+  # 2. Check SATA attributes
+  if smartctl -a "\$PATH_DEV" 2>/dev/null | grep -q "ID# ATTRIBUTE_NAME"; then
+    ATTRS_OUT=\$(smartctl -A "\$PATH_DEV" 2>/dev/null)
+    
+    # ID 5: Reallocated Sector Count
+    REALLOC=\$(echo "\$ATTRS_OUT" | awk '\$1==5 {print \$10}')
+    if [ ! -z "\$REALLOC" ] && [ "\$REALLOC" -gt 0 ] 2>/dev/null; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Reallocated Sectors = \${REALLOC}"
+      echo "Reallocated Sectors = \$REALLOC on \$PATH_DEV"
+    fi
+
+    # ID 197: Current Pending Sector Count
+    PENDING=\$(echo "\$ATTRS_OUT" | awk '\$1==197 {print \$10}')
+    if [ ! -z "\$PENDING" ] && [ "\$PENDING" -gt 0 ] 2>/dev/null; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Current Pending Sectors = \${PENDING}"
+      echo "Pending Sectors = \$PENDING on \$PATH_DEV"
+    fi
+
+    # ID 198: Offline Uncorrectable
+    OFFLINE=\$(echo "\$ATTRS_OUT" | awk '\$1==198 {print \$10}')
+    if [ ! -z "\$OFFLINE" ] && [ "\$OFFLINE" -gt 0 ] 2>/dev/null; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: Offline Uncorrectable Sectors = \${OFFLINE}"
+      echo "Offline Uncorrectable = \$OFFLINE on \$PATH_DEV"
+    fi
+
+    # ID 199: UDMA CRC Error Count
+    CRC=\$(echo "\$ATTRS_OUT" | awk '\$1==199 {print \$10}')
+    if [ ! -z "\$CRC" ] && [ "\$CRC" -gt 0 ] 2>/dev/null; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: UDMA CRC Errors = \${CRC}"
+      echo "UDMA CRC Errors = \$CRC on \$PATH_DEV"
+    fi
+  fi
+
+  # 3. Check NVMe-specific attributes
+  if [[ "\$DEV" =~ ^nvme ]]; then
+    NVME_OUT=\$(smartctl -a "\$PATH_DEV" 2>/dev/null)
+    
+    # Critical Warning
+    CRIT_WARN=\$(echo "\$NVME_OUT" | grep -i "Critical Warning:" | awk '{print \$3}')
+    if [ ! -z "\$CRIT_WARN" ] && [ "\$CRIT_WARN" != "0x00" ]; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: NVMe Critical Warning = \${CRIT_WARN}"
+      echo "NVMe Critical Warning = \$CRIT_WARN on \$PATH_DEV"
+    fi
+    
+    # Media and Data Integrity Errors
+    MEDIA_ERR=\$(echo "\$NVME_OUT" | grep -i "Media and Data Integrity Errors:" | awk '{print \$6}')
+    MEDIA_ERR_CLEAN=\$(echo "\$MEDIA_ERR" | tr -cd '0-9')
+    if [ ! -z "\$MEDIA_ERR_CLEAN" ] && [ "\$MEDIA_ERR_CLEAN" -gt 0 ] 2>/dev/null; then
+      ERRORS="\${ERRORS}\\n- *\${PATH_DEV}*: NVMe Media and Data Integrity Errors = \${MEDIA_ERR}"
+      echo "NVMe Media Errors = \$MEDIA_ERR on \$PATH_DEV"
+    fi
+  fi
+done
+
+if [ -z "\$ERRORS" ]; then
+  echo "All disks healthy. No errors detected."
+fi
+
+# Send Telegram notification if enabled
+if [ ! -z "\$ERRORS" ] && [ "\$TELEGRAM_ENABLED" = "1" ] && [ ! -z "\$TELEGRAM_TOKEN" ] && [ ! -z "\$TELEGRAM_CHAT_ID" ]; then
+  HOSTNAME=\$(hostname)
+  MSG="⚠️ *Disk Health Warning on \${HOSTNAME}* ⚠️\\n\${ERRORS}"
+  echo "Sending Telegram alert..."
+  curl -s -X POST "https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage" \\
+    -d "chat_id=\${TELEGRAM_CHAT_ID}" \\
+    --data-urlencode "text=\$(echo -e "\${MSG}")" \\
+    -d "parse_mode=Markdown" >/dev/null
+fi
+`;
+}
+
 async function saveConfig() {
   const enabled = schedEnabledCheck.checked ? "1" : "0";
   const testType = settingsTestType.value;
@@ -124,6 +240,7 @@ async function saveConfig() {
   ];
   const content = lines.join("\n") + "\n";
 
+  // Save Config File
   const writeRes = await runCommand(["tee", "/etc/disk-health-config.env"], { 
     superuser: "require", 
     input: content 
@@ -131,6 +248,26 @@ async function saveConfig() {
 
   if (writeRes.code !== 0) {
     throw new Error(`Failed to write config file: ${writeRes.error || "unknown error"}`);
+  }
+
+  // Save Check Script
+  const scriptContent = generateCheckScriptContent();
+  const scriptRes = await runCommand(["tee", "/usr/local/bin/disk-health-check.sh"], {
+    superuser: "require",
+    input: scriptContent
+  });
+
+  if (scriptRes.code !== 0) {
+    throw new Error(`Failed to write check script: ${scriptRes.error || "unknown error"}`);
+  }
+
+  // Chmod script
+  const chmodRes = await runCommand(["chmod", "+x", "/usr/local/bin/disk-health-check.sh"], {
+    superuser: "require"
+  });
+
+  if (chmodRes.code !== 0) {
+    throw new Error(`Failed to make check script executable: ${chmodRes.error || "unknown error"}`);
   }
 
   alert("Settings saved successfully!");
@@ -154,6 +291,24 @@ btnSaveSettings.addEventListener("click", async () => {
   } finally {
     btnSaveSettings.disabled = false;
     btnSaveSettings.textContent = "Save Settings";
+  }
+});
+
+btnRunCheck.addEventListener("click", async () => {
+  btnRunCheck.disabled = true;
+  btnRunCheck.textContent = "Running...";
+  try {
+    const res = await runCommand(["/usr/local/bin/disk-health-check.sh"], { superuser: "require" });
+    if (res.code === 0) {
+      alert("Check script executed successfully!" + (res.stdout ? "\n\nOutput:\n" + res.stdout : ""));
+    } else {
+      alert("Error running check script: " + (res.error || res.stdout || "unknown error"));
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    btnRunCheck.disabled = false;
+    btnRunCheck.textContent = "Run Check Now";
   }
 });
 
