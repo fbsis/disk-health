@@ -207,58 +207,61 @@ export function setupScheduler() {
     }
   });
 
+  async function writeScriptOnDemand() {
+    const enabled = schedEnabledCheck.checked ? "1" : "0";
+    const testType = settingsTestType.value;
+    const frequency = settingsFrequency.value;
+    const tgEnabled = tgEnabledCheck.checked ? "1" : "0";
+    const tgToken = settingsTgToken.value.trim();
+    const tgChatId = settingsTgChatId.value.trim();
+
+    const lines = [
+      `ENABLED=${enabled}`,
+      `TEST_TYPE="${testType}"`,
+      `FREQUENCY="${frequency}"`,
+      `TELEGRAM_ENABLED=${tgEnabled}`,
+      `TELEGRAM_TOKEN="${tgToken}"`,
+      `TELEGRAM_CHAT_ID="${tgChatId}"`
+    ];
+    const content = lines.join("\n") + "\n";
+
+    // Save Config File
+    const writeRes = await runCommand(["tee", "/etc/disk-health-config.env"], { 
+      superuser: "require", 
+      input: content 
+    });
+
+    if (writeRes.code !== 0) {
+      throw new Error(`Failed to write config file: ${writeRes.error || "unknown error"}`);
+    }
+
+    // Save Check Script
+    const scriptContent = generateCheckScriptContent();
+    const scriptRes = await runCommand(["tee", "/usr/local/bin/disk-health-check.sh"], {
+      superuser: "require",
+      input: scriptContent
+    });
+
+    if (scriptRes.code !== 0) {
+      throw new Error(`Failed to write check script: ${scriptRes.error || "unknown error"}`);
+    }
+
+    // Chmod script
+    const chmodRes = await runCommand(["chmod", "+x", "/usr/local/bin/disk-health-check.sh"], {
+      superuser: "require"
+    });
+
+    if (chmodRes.code !== 0) {
+      throw new Error(`Failed to make check script executable: ${chmodRes.error || "unknown error"}`);
+    }
+  }
+
   // Save Config handler
   btnSaveSettings.addEventListener("click", async () => {
     btnSaveSettings.disabled = true;
     btnSaveSettings.textContent = "Saving...";
     try {
-      const enabled = schedEnabledCheck.checked ? "1" : "0";
-      const testType = settingsTestType.value;
-      const frequency = settingsFrequency.value;
-      const tgEnabled = tgEnabledCheck.checked ? "1" : "0";
-      const tgToken = settingsTgToken.value.trim();
-      const tgChatId = settingsTgChatId.value.trim();
-
-      const lines = [
-        `ENABLED=${enabled}`,
-        `TEST_TYPE="${testType}"`,
-        `FREQUENCY="${frequency}"`,
-        `TELEGRAM_ENABLED=${tgEnabled}`,
-        `TELEGRAM_TOKEN="${tgToken}"`,
-        `TELEGRAM_CHAT_ID="${tgChatId}"`
-      ];
-      const content = lines.join("\n") + "\n";
-
-      // Save Config File
-      const writeRes = await runCommand(["tee", "/etc/disk-health-config.env"], { 
-        superuser: "require", 
-        input: content 
-      });
-
-      if (writeRes.code !== 0) {
-        throw new Error(`Failed to write config file: ${writeRes.error || "unknown error"}`);
-      }
-
-      // Save Check Script
-      const scriptContent = generateCheckScriptContent();
-      const scriptRes = await runCommand(["tee", "/usr/local/bin/disk-health-check.sh"], {
-        superuser: "require",
-        input: scriptContent
-      });
-
-      if (scriptRes.code !== 0) {
-        throw new Error(`Failed to write check script: ${scriptRes.error || "unknown error"}`);
-      }
-
-      // Chmod script
-      const chmodRes = await runCommand(["chmod", "+x", "/usr/local/bin/disk-health-check.sh"], {
-        superuser: "require"
-      });
-
-      if (chmodRes.code !== 0) {
-        throw new Error(`Failed to make check script executable: ${chmodRes.error || "unknown error"}`);
-      }
-
+      await writeScriptOnDemand();
       alert("Settings saved successfully!");
       const modalInstance = window.bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
@@ -275,6 +278,9 @@ export function setupScheduler() {
     btnRunCheck.disabled = true;
     btnRunCheck.textContent = "Running...";
     try {
+      // Ensure the configuration and check script are saved/updated before executing
+      await writeScriptOnDemand();
+
       const res = await runCommand(["/usr/local/bin/disk-health-check.sh"], { superuser: "require" });
       if (res.code === 0) {
         alert("Check script executed successfully!" + (res.stdout ? "\n\nOutput:\n" + res.stdout : ""));
