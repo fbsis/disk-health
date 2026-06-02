@@ -183,8 +183,9 @@ function escapeRegex(text) {
 export function parseSelfTests(stdout) {
   const tests = [];
   let inProgress = null;
+  let powerOnHours = null;
   
-  if (!stdout) return { inProgress, history: tests };
+  if (!stdout) return { inProgress, history: tests, powerOnHours };
 
   // Look for active self-test status line
   const activeMatch = stdout.match(/Self-test in progress\s*\(?(\d+)%\s*remaining\)?/i) || 
@@ -194,6 +195,14 @@ export function parseSelfTests(stdout) {
       status: "In Progress",
       remaining: `${activeMatch[1]}%`
     };
+  }
+
+  // Parse Power On Hours if present
+  const powerOnMatch = stdout.match(/Power On Hours:\s*([0-9,]+)/i) || 
+                       stdout.match(/Power_On_Hours\s+\S+\s+\d+\s+\d+\s+\d+\s+\S+\s+\S+\s+\S+\s+(\d+)/i) ||
+                       stdout.match(/Power_On_Hours\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(\d+)/i);
+  if (powerOnMatch) {
+    powerOnHours = parseInt(powerOnMatch[1].replace(/,/g, ""), 10);
   }
 
   const lines = stdout.split(/\r?\n/);
