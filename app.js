@@ -1,6 +1,27 @@
 import { parseLsblk, parseSmartctl, parseZpoolList } from "./parsers.js";
 
 const cockpit = window.cockpit;
+
+function runCommand(args, options = {}) {
+  return new Promise((resolve) => {
+    if (!cockpit) {
+      resolve({ stdout: "", code: -1, error: "Cockpit not loaded" });
+      return;
+    }
+    cockpit.spawn(args, options)
+      .done((stdout) => {
+        resolve({ stdout, code: 0 });
+      })
+      .fail((exception, stdout) => {
+        resolve({
+          stdout: stdout || "",
+          code: exception.exit_status || exception.close || -1,
+          error: exception.message || String(exception)
+        });
+      });
+  });
+}
+
 const disksEl = document.getElementById("disks");
 const historyEl = document.getElementById("history");
 const lastTsEl = document.getElementById("last-timestamp");
@@ -92,28 +113,25 @@ async function refreshHistory() {
 
 async function collectSnapshot() {
   let hostname = "localhost";
-  try {
-    const hostnameOut = await cockpit.spawn(["hostname"]);
-    hostname = hostnameOut.trim();
-  } catch (e) {
-    console.warn("Could not get hostname", e);
+  const hostnameRes = await runCommand(["hostname"]);
+  if (hostnameRes.code === 0) {
+    hostname = hostnameRes.stdout.trim();
   }
 
   let zpoolMap = null;
-  try {
-    const zpoolResult = await cockpit.spawn(["zpool", "list", "-p", "-H", "-o", "name,size,alloc,free"]);
-    if (zpoolResult) {
-      zpoolMap = parseZpoolList(zpoolResult);
-    }
-  } catch (err) {
-    console.warn("Failed to get zpool list:", err?.message || err);
+  const zpoolRes = await runCommand(["zpool", "list", "-p", "-H", "-o", "name,size,alloc,free"]);
+  if (zpoolRes.code === 0 && zpoolRes.stdout) {
+    zpoolMap = parseZpoolList(zpoolRes.stdout);
   }
 
-  const lsblkResult = await cockpit.spawn([
+  const lsblkRes = await runCommand([
     "lsblk", "-J", "-b", "-o", "NAME,MODEL,SIZE,TYPE,TRAN,ROTA,MOUNTPOINT,FSTYPE,FSAVAIL,FSUSED,FSUSE%,LABEL"
   ]);
+  if (lsblkRes.code !== 0) {
+    throw new Error(`lsblk failed: ${lsblkRes.error || "unknown error"}`);
+  }
   
-  const blockdevices = parseLsblk(lsblkResult);
+  const blockdevices = parseLsblk(lsblkRes.stdout);
   const disks = buildDisks(blockdevices, zpoolMap);
 
   const disksWithSmart = [];
@@ -121,17 +139,15 @@ async function collectSnapshot() {
     let smart = { health: null, temperatureC: null, attributes: [], meta: {}, attributesByName: {}, nvme: {} };
     let smartError = null;
     let smartRaw = "";
-    try {
-      smartRaw = await cockpit.spawn(["smartctl", "-a", disk.path], { superuser: "require" });
+    
+    const smartRes = await runCommand(["smartctl", "-a", disk.path], { superuser: "require" });
+    smartRaw = smartRes.stdout;
+    if (smartRaw) {
       smart = parseSmartctl(smartRaw);
-    } catch (err) {
-      if (err.stdout) {
-        smartRaw = err.stdout;
-        smart = parseSmartctl(smartRaw);
-      } else {
-        smartError = err.message || String(err);
-      }
+    } else {
+      smartError = smartRes.error || "Failed to retrieve SMART details";
     }
+
     disksWithSmart.push({
       ...disk,
       smart,
@@ -156,6 +172,9 @@ async function collectSnapshot() {
 async function saveSnapshot(snapshot) {
   if (!snapshotFilePath) return;
   try {
+    const dirPath = snapshotFilePath.substring(0, snapshotFilePath.lastIndexOf("/"));
+    await runCommand(["mkdir", "-p", dirPath]);
+
     const file = cockpit.file(snapshotFilePath);
     let content = "";
     try {
@@ -211,6 +230,8 @@ function buildDisks(blockdevices, zpoolMap) {
   const disks = [];
   for (const dev of blockdevices) {
     if (dev.type !== "disk") continue;
+    // Exclude loop devices and ZFS zvols (zd*)
+    if (dev.name.startsWith("loop") || dev.name.startsWith("zd")) continue;
     const disk = {
       name: dev.name,
       path: `/dev/${dev.name}`,
