@@ -396,6 +396,8 @@ async function refreshSelfTests() {
         const nvmeRes = await runCommand(["nvme", "self-test-log", path, "-o", "json"], { superuser: "require" });
         if (nvmeRes.code === 0 && nvmeRes.stdout) {
           parsed = parseNvmeCliSelfTest(nvmeRes.stdout);
+        } else {
+          parsed = { error: "nvme-cli-missing" };
         }
       }
       
@@ -404,7 +406,12 @@ async function refreshSelfTests() {
       }
 
       // If both smartctl and nvme-cli failed to get self-tests status, render warning
-      if (!parsed || (parsed.history.length === 0 && !parsed.inProgress && isSmartctlFailed)) {
+      if (!parsed || (parsed.history && parsed.history.length === 0 && !parsed.inProgress && isSmartctlFailed) || (parsed && parsed.error === "nvme-cli-missing")) {
+        let warningMsg = "SMART self-test log is not supported or failed to read on this device (e.g. Invalid Field in Command). The background test may still be running, but its history log cannot be read.";
+        if (parsed && parsed.error === "nvme-cli-missing") {
+          warningMsg = `SMART self-test log failed to read via smartctl on this NVMe device. <strong>Please install <code>nvme-cli</code> (run <code>apt install nvme-cli</code>) on the host</strong> to enable native NVMe log querying fallback.`;
+        }
+        
         html += `
           <div class="card mb-4 border shadow-sm">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
@@ -413,8 +420,7 @@ async function refreshSelfTests() {
             </div>
             <div class="card-body p-3">
               <div class="text-warning small">
-                ⚠️ SMART self-test log is not supported or failed to read on this device (e.g. Invalid Field in Command). 
-                The background test may still be running, but its history log cannot be read by the tools.
+                ⚠️ ${warningMsg}
               </div>
             </div>
           </div>
