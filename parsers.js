@@ -179,3 +179,62 @@ function toCamel(text) {
 function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+export function parseSelfTests(stdout) {
+  const tests = [];
+  let inProgress = null;
+  
+  if (!stdout) return { inProgress, history: tests };
+
+  // Look for active self-test status line
+  const activeMatch = stdout.match(/Self-test in progress\s*\(?(\d+)%\s*remaining\)?/i) || 
+                      stdout.match(/Self-test in progress\s+(\d+)%/i);
+  if (activeMatch) {
+    inProgress = {
+      status: "In Progress",
+      remaining: `${activeMatch[1]}%`
+    };
+  }
+
+  const lines = stdout.split(/\r?\n/);
+  let tableStarted = false;
+  lines.forEach((line) => {
+    // Detect table headers
+    if (line.includes("Test_Description") || line.includes("LBA_of_first_error") || line.includes("LBA_of_1st_error")) {
+      tableStarted = true;
+      return;
+    }
+    if (tableStarted) {
+      // Line should start with # number, e.g. "# 1  Short offline..."
+      const match = line.trim().match(/^#\s*(\d+)\s+([A-Za-z0-9\s._-]+?)\s{2,}(.+?)\s+(\d+%)\s+(\d+)\s+(.+)$/);
+      if (match) {
+        tests.push({
+          num: match[1],
+          description: match[2].trim(),
+          status: match[3].trim(),
+          remaining: match[4].trim(),
+          lifetime: match[5].trim(),
+          lba: match[6].trim()
+        });
+      } else {
+        // Fallback match for shorter/different columns
+        const simplerMatch = line.trim().match(/^#\s*(\d+)\s+([A-Za-z0-9\s._-]+?)\s{2,}(.+?)\s+(\d+%)/);
+        if (simplerMatch) {
+          tests.push({
+            num: simplerMatch[1],
+            description: simplerMatch[2].trim(),
+            status: simplerMatch[3].trim(),
+            remaining: simplerMatch[4].trim(),
+            lifetime: "-",
+            lba: "-"
+          });
+        }
+      }
+    }
+  });
+
+  return {
+    inProgress,
+    history: tests
+  };
+}
