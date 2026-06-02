@@ -464,7 +464,11 @@ async function refreshSelfTests() {
       }
 
       // If both smartctl and nvme-cli failed to get self-tests status, render warning
-      if (!parsed || (parsed.history && parsed.history.length === 0 && !parsed.inProgress && isSmartctlFailed) || (parsed && parsed.error === "nvme-cli-missing")) {
+      const failedToRead = !parsed || 
+                           (parsed.error === "nvme-cli-missing") || 
+                           (!disk.startsWith("nvme") && isSmartctlFailed);
+
+      if (failedToRead) {
         let warningMsg = "SMART self-test log is not supported or failed to read on this device (e.g. Invalid Field in Command). The background test may still be running, but its history log cannot be read.";
         if (parsed && parsed.error === "nvme-cli-missing") {
           warningMsg = `SMART self-test log failed to read via smartctl on this NVMe device. <strong>Please install <code>nvme-cli</code> (run <code>apt install nvme-cli</code>) on the host</strong> to enable native NVMe log querying fallback.`;
