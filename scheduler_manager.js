@@ -1,4 +1,5 @@
 import { runCommand } from "./data_collector.js";
+import { parseSelfTests } from "./parsers.js";
 
 function generateCheckScriptContent() {
   return `#!/usr/bin/env bash
@@ -331,4 +332,137 @@ export function setupScheduler() {
       btnTestTg.textContent = "Test Telegram";
     }
   });
+
+  // Bind SMART Self-Tests logs refresh
+  const btnRefreshSelfTests = document.getElementById("btn-refresh-selftests");
+  if (btnRefreshSelfTests) {
+    btnRefreshSelfTests.addEventListener("click", async () => {
+      btnRefreshSelfTests.disabled = true;
+      await refreshSelfTests();
+      btnRefreshSelfTests.disabled = false;
+    });
+  }
+
+  // Load self-tests logs when switching tabs
+  const tabLogsBtn = document.getElementById("tab-logs-btn");
+  if (tabLogsBtn) {
+    tabLogsBtn.addEventListener("shown.bs.tab", async () => {
+      await refreshSelfTests();
+    });
+  }
+}
+
+async function refreshSelfTests() {
+  const container = document.getElementById("selftests-container");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="d-flex align-items-center justify-content-center py-4">
+      <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+      <span class="text-muted">Querying SMART self-test status on all drives...</span>
+    </div>
+  `;
+
+  try {
+    // 1. Get physical disks list
+    const res = await runCommand(["lsblk", "-dno", "name"]);
+    if (res.code !== 0) {
+      container.innerHTML = `<div class="text-danger py-4">Failed to query physical disks: ${res.error || "unknown error"}</div>`;
+      return;
+    }
+
+    const disks = res.stdout.trim().split(/\r?\n/)
+      .map(n => n.trim())
+      .filter(n => n && !n.startsWith("zd") && !n.startsWith("loop"));
+
+    if (disks.length === 0) {
+      container.innerHTML = `<div class="text-muted text-center py-4">No physical disks found.</div>`;
+      return;
+    }
+
+    let html = "";
+
+    for (const disk of disks) {
+      const path = `/dev/${disk}`;
+      const logRes = await runCommand(["smartctl", "-l", "self-test", path], { superuser: "require" });
+      const parsed = parseSelfTests(logRes.stdout);
+
+      // Render Active Test Progress if in progress
+      let activeHtml = "";
+      if (parsed.inProgress) {
+        activeHtml = `
+          <div class="alert alert-info py-2 px-3 mb-2 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+              <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+              <strong>Self-test currently running!</strong>
+            </div>
+            <span class="badge bg-info text-white">${parsed.inProgress.remaining} remaining</span>
+          </div>
+        `;
+      } else {
+        activeHtml = `<div class="text-muted small mb-2">No active self-test currently running.</div>`;
+      }
+
+      // Render history table
+      let tableRows = "";
+      if (parsed.history.length === 0) {
+        tableRows = `<tr><td colspan="6" class="text-muted text-center py-3">No self-test history logged.</td></tr>`;
+      } else {
+        tableRows = parsed.history.map((t) => {
+          let badgeClass = "bg-secondary";
+          const statusText = t.status.toLowerCase();
+          if (statusText.includes("complete") || statusText.includes("without error")) {
+            badgeClass = "bg-success";
+          } else if (statusText.includes("aborted") || statusText.includes("interrupted")) {
+            badgeClass = "bg-warning text-dark";
+          } else if (statusText.includes("fail") || statusText.includes("fatal") || statusText.includes("error")) {
+            badgeClass = "bg-danger";
+          }
+          return `
+            <tr>
+              <td class="fw-medium">#${t.num}</td>
+              <td>${t.description}</td>
+              <td><span class="badge ${badgeClass}">${t.status}</span></td>
+              <td>${t.remaining}</td>
+              <td>${t.lifetime} hrs</td>
+              <td><code>${t.lba}</code></td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      html += `
+        <div class="card mb-4 border shadow-sm">
+          <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold">${path}</h6>
+            <span class="badge bg-secondary text-uppercase">${disk.startsWith("nvme") ? "NVMe" : "SATA"}</span>
+          </div>
+          <div class="card-body p-3">
+            ${activeHtml}
+            <div class="table-responsive mt-3">
+              <table class="table table-sm table-striped mb-0 small">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Type</th>
+                    <th>Status / Result</th>
+                    <th>Remaining</th>
+                    <th>Completed at</th>
+                    <th>LBA 1st Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div class="text-danger py-4">Error loading test status: ${err.message}</div>`;
+  }
 }

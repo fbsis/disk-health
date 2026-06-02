@@ -117,60 +117,92 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body p-4">
-            <form id="form-settings">
-              <!-- Section 1: Scheduler -->
-              <h6 class="text-uppercase text-primary fw-bold mb-3" style="font-size: 0.85rem; letter-spacing: 0.05em;">Periodic Verification</h6>
-              
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="settings-sched-enabled">
-                <label class="form-check-label fw-medium" for="settings-sched-enabled">Enable Background Health Scheduling</label>
-                <div class="text-muted small">Runs tests and verifies disk health in the background using native Systemd timers.</div>
-              </div>
+            <!-- Modal Tabs Nav -->
+            <ul class="nav nav-pills mb-4" id="modal-settings-tabs" role="tablist">
+              <li class="nav-item text-center flex-fill" role="presentation">
+                <button class="nav-link active w-100 fw-semibold" id="tab-config-btn" data-bs-toggle="pill" data-bs-target="#tab-config-pane" type="button" role="tab" aria-controls="tab-config-pane" aria-selected="true">
+                  Alert & Schedule Config
+                </button>
+              </li>
+              <li class="nav-item text-center flex-fill" role="presentation">
+                <button class="nav-link w-100 fw-semibold" id="tab-logs-btn" data-bs-toggle="pill" data-bs-target="#tab-logs-pane" type="button" role="tab" aria-controls="tab-logs-pane" aria-selected="false">
+                  SMART Self-Tests & Logs
+                </button>
+              </li>
+            </ul>
 
-              <div id="sched-options-group" class="row g-3 mb-4 d-none">
-                <div class="col-md-6">
-                  <label for="settings-test-type" class="form-label small fw-semibold text-muted">SMART Test Type</label>
-                  <select id="settings-test-type" class="form-select">
-                    <option value="none">None (Read SMART Attributes only)</option>
-                    <option value="short">Short Self-Test</option>
-                    <option value="long">Long / Complete Self-Test</option>
-                    <option value="offline">Immediate Offline Test</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label for="settings-frequency" class="form-label small fw-semibold text-muted">Check Frequency</label>
-                  <select id="settings-frequency" class="form-select">
-                    <option value="daily">Daily (at 3:00 AM)</option>
-                    <option value="weekly">Weekly (Sundays at 3:00 AM)</option>
-                    <option value="monthly">Monthly (1st of Month at 3:00 AM)</option>
-                  </select>
-                </div>
-              </div>
-
-              <hr class="my-4">
-
-              <!-- Section 2: Telegram Notifications -->
-              <h6 class="text-uppercase text-primary fw-bold mb-3" style="font-size: 0.85rem; letter-spacing: 0.05em;">Telegram Notifications</h6>
-              
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="settings-tg-enabled">
-                <label class="form-check-label fw-medium" for="settings-tg-enabled">Enable Telegram Alerts</label>
-                <div class="text-muted small">Sends warning notifications directly to a Telegram channel/chat when disk health anomalies are detected.</div>
-              </div>
-
-              <div id="tg-options-group" class="mb-4 d-none">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label for="settings-tg-token" class="form-label small fw-semibold text-muted">Bot Token</label>
-                    <input type="password" class="form-control" id="settings-tg-token" placeholder="123456789:ABCdefGhIjkLmNoPqRsTuvWxYz">
+            <div class="tab-content" id="modal-settings-tabs-content">
+              <!-- Tab 1: Config Form -->
+              <div class="tab-pane fade show active" id="tab-config-pane" role="tabpanel" aria-labelledby="tab-config-btn">
+                <form id="form-settings">
+                  <!-- Section 1: Scheduler -->
+                  <h6 class="text-uppercase text-primary fw-bold mb-3" style="font-size: 0.85rem; letter-spacing: 0.05em;">Periodic Verification</h6>
+                  
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="settings-sched-enabled">
+                    <label class="form-check-label fw-medium" for="settings-sched-enabled">Enable Background Health Scheduling</label>
+                    <div class="text-muted small">Runs tests and verifies disk health in the background using native Systemd timers.</div>
                   </div>
-                  <div class="col-md-6">
-                    <label for="settings-tg-chat-id" class="form-label small fw-semibold text-muted">Chat ID</label>
-                    <input type="text" class="form-control" id="settings-tg-chat-id" placeholder="-1001234567890">
+
+                  <div id="sched-options-group" class="row g-3 mb-4 d-none">
+                    <div class="col-md-6">
+                      <label for="settings-test-type" class="form-label small fw-semibold text-muted">SMART Test Type</label>
+                      <select id="settings-test-type" class="form-select">
+                        <option value="none">None (Read SMART Attributes only)</option>
+                        <option value="short">Short Self-Test</option>
+                        <option value="long">Long / Complete Self-Test</option>
+                        <option value="offline">Immediate Offline Test</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="settings-frequency" class="form-label small fw-semibold text-muted">Check Frequency</label>
+                      <select id="settings-frequency" class="form-select">
+                        <option value="daily">Daily (at 3:00 AM)</option>
+                        <option value="weekly">Weekly (Sundays at 3:00 AM)</option>
+                        <option value="monthly">Monthly (1st of Month at 3:00 AM)</option>
+                      </select>
+                    </div>
                   </div>
+
+                  <hr class="my-4">
+
+                  <!-- Section 2: Telegram Notifications -->
+                  <h6 class="text-uppercase text-primary fw-bold mb-3" style="font-size: 0.85rem; letter-spacing: 0.05em;">Telegram Notifications</h6>
+                  
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="settings-tg-enabled">
+                    <label class="form-check-label fw-medium" for="settings-tg-enabled">Enable Telegram Alerts</label>
+                    <div class="text-muted small">Sends warning notifications directly to a Telegram channel/chat when disk health anomalies are detected.</div>
+                  </div>
+
+                  <div id="tg-options-group" class="mb-4 d-none">
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label for="settings-tg-token" class="form-label small fw-semibold text-muted">Bot Token</label>
+                        <input type="password" class="form-control" id="settings-tg-token" placeholder="123456789:ABCdefGhIjkLmNoPqRsTuvWxYz">
+                      </div>
+                      <div class="col-md-6">
+                        <label for="settings-tg-chat-id" class="form-label small fw-semibold text-muted">Chat ID</label>
+                        <input type="text" class="form-control" id="settings-tg-chat-id" placeholder="-1001234567890">
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Tab 2: Logs & Running Status -->
+              <div class="tab-pane fade" id="tab-logs-pane" role="tabpanel" aria-labelledby="tab-logs-btn">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <h6 class="text-uppercase text-primary fw-bold mb-0" style="font-size: 0.85rem; letter-spacing: 0.05em;">SMART Self-Test Status & History</h6>
+                  <button type="button" id="btn-refresh-selftests" class="btn btn-sm btn-outline-secondary">
+                    Refresh Status
+                  </button>
+                </div>
+                <div id="selftests-container">
+                  <div class="text-muted text-center py-4">Click "Refresh Status" to query active tests and history.</div>
                 </div>
               </div>
-            </form>
+            </div>
           </div>
           <div class="modal-footer bg-light border-0">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
