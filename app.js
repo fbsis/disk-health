@@ -127,6 +127,24 @@ async function init() {
   setSnapshotFilePath(snapshotFilePath);
   console.log("Disk Health extension initialized. History file path:", snapshotFilePath);
   await refreshHistory();
+
+  // Auto-collect if last run is > 24h old or no history exists
+  const snaps = getLoadedSnapshotsList();
+  let shouldCollect = false;
+  if (!snaps || snaps.length === 0) {
+    shouldCollect = true;
+  } else {
+    const lastTime = new Date(snaps[0].timestamp).getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    if (Date.now() - lastTime > oneDayMs) {
+      shouldCollect = true;
+    }
+  }
+
+  if (shouldCollect) {
+    console.log("Last collection was more than 1 day ago (or never). Starting auto-collect...");
+    triggerCollect().catch((err) => console.error("Auto-collect failed:", err));
+  }
 }
 
 // Start Initialization
