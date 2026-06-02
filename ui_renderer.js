@@ -132,6 +132,22 @@ export function renderSnapshot(snapshot) {
             <summary class="text-info">NVMe SMART (Key fields)</summary>
             ${renderNvme(disk.smart?.nvme || {})}
           </details>` : ""}
+          <details class="mt-3">
+            <summary class="text-info">Run SMART Self-Test</summary>
+            <div class="p-2 border rounded mt-2 bg-light">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <select id="run-test-type-${slug}" class="form-select form-select-sm w-auto">
+                  <option value="short">Short Self-Test</option>
+                  <option value="long">Long Self-Test</option>
+                  <option value="offline">Offline Test</option>
+                </select>
+                <button class="btn btn-sm btn-primary btn-run-smart-test" data-disk-path="${disk.path}" data-slug="${slug}">
+                  Run Test
+                </button>
+              </div>
+              <div id="smart-test-status-${slug}" class="text-muted small mt-2">Ready. (Tests run in the background on the drive)</div>
+            </div>
+          </details>
           <div class="mt-3">
             <div class="text-muted small">Temperature (History)</div>
             <canvas id="${chartId}" height="120"></canvas>
@@ -166,6 +182,40 @@ export function renderSnapshot(snapshot) {
 
   disksEl.appendChild(tabs);
   disksEl.appendChild(content);
+
+  // Bind SMART self-test buttons
+  const smartButtons = document.querySelectorAll(".btn-run-smart-test");
+  smartButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const diskPath = btn.dataset.diskPath;
+      const slug = btn.dataset.slug;
+      const selectEl = document.getElementById(`run-test-type-${slug}`);
+      const statusEl = document.getElementById(`smart-test-status-${slug}`);
+      if (!selectEl || !statusEl) return;
+
+      const testType = selectEl.value;
+      btn.disabled = true;
+      statusEl.textContent = "Triggering test...";
+      statusEl.className = "text-info small mt-2";
+
+      try {
+        const { runCommand } = await import("./data_collector.js");
+        const res = await runCommand(["smartctl", "-t", testType, diskPath], { superuser: "require" });
+        if (res.code === 0) {
+          statusEl.textContent = `Test successfully triggered! Info: ${res.stdout.trim()}`;
+          statusEl.className = "text-success small mt-2";
+        } else {
+          statusEl.textContent = `Failed to trigger: ${res.error || res.stdout || "unknown error"}`;
+          statusEl.className = "text-danger small mt-2";
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = "text-danger small mt-2";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
 
   // Initialize Bootstrap Tooltips
   if (window.bootstrap && window.bootstrap.Tooltip) {
