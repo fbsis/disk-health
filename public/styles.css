@@ -1,0 +1,150 @@
+:root {
+  --bg-1: #ffffff;
+  --bg-2: #f8fafc;
+  --accent: #0284c7;
+  --accent-soft: rgba(2, 132, 199, 0.12);
+  --card: #ffffff;
+  --text: #0f172a;
+}
+
+body {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg-1);
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(2, 132, 199, 0.08), transparent 45%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.06), transparent 40%),
+    linear-gradient(160deg, var(--bg-1), var(--bg-2));
+  z-index: -1;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: #0369a1;
+  border-color: #0369a1;
+}
+
+.stat {
+  padding: 0.5rem 0.75rem;
+  background: rgba(241, 245, 249, 0.8);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.disk-card {
+  background: #ffffff;
+}
+
+.disk-meta {
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.badge-health {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #ffffff !important;
+}
+
+.badge-health.good {
+  background: #10b981;
+}
+
+.badge-health.warn {
+  background: #f59e0b;
+}
+
+.badge-health.bad {
+  background: #ef4444;
+}
+
+.table {
+  color: var(--text);
+}
+
+.table thead th {
+  color: #334155;
+  border-color: rgba(148, 163, 184, 0.25);
+  font-weight: 600;
+}
+
+.table tbody td {
+  border-color: rgba(148, 163, 184, 0.15);
+  color: #334155;
+}
+
+pre {
+  color: #0f172a;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  max-height: 300px;
+  overflow: auto;
+}
+
+.nav-tabs .nav-link {
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.nav-tabs .nav-link.active {
+  color: #0f172a;
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.3) rgba(148, 163, 184, 0.3) transparent;
+  font-weight: 500;
+}
+
+.issue-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff !important;
+}
+
+.issue-badge.ok {
+  background: #10b981;
+}
+
+.issue-badge.danger {
+  background: #ef4444;
+}
+
+.fade-in {
+  animation: fadeIn 0.45s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
