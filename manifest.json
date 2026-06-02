@@ -1,7 +1,7 @@
 {
   "version": 0,
   "tools": {
-    "disk-health-remote": {
+    "disk-health": {
       "label": "Disk Health",
       "path": "index.html",
       "icon": "drive-harddisk"

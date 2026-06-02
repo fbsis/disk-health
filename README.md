@@ -44,7 +44,7 @@ Clone the repository directly into Cockpit's system-wide package directory:
 mkdir -p /usr/share/cockpit
 
 # Clone the repository from GitHub
-git clone https://github.com/fbsis/disk-health-remote.git /usr/share/cockpit/disk-health-remote
+git clone https://github.com/fbsis/disk-health.git /usr/share/cockpit/disk-health
 ```
 No build steps or dependency installations are required, as the extension is client-side only.
 
