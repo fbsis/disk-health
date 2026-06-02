@@ -24,6 +24,36 @@ btnCollect.addEventListener("click", async () => {
   await triggerCollect();
 });
 
+btnSettings.addEventListener("click", () => {
+  const modalEl = document.getElementById("modal-settings");
+  const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalInstance.show();
+});
+
+const schedEnabledCheck = document.getElementById("settings-sched-enabled");
+const schedOptionsGroup = document.getElementById("sched-options-group");
+const tgEnabledCheck = document.getElementById("settings-tg-enabled");
+const tgOptionsGroup = document.getElementById("tg-options-group");
+const btnTestTg = document.getElementById("btn-test-tg");
+
+schedEnabledCheck.addEventListener("change", () => {
+  if (schedEnabledCheck.checked) {
+    schedOptionsGroup.classList.remove("d-none");
+  } else {
+    schedOptionsGroup.classList.add("d-none");
+  }
+});
+
+tgEnabledCheck.addEventListener("change", () => {
+  if (tgEnabledCheck.checked) {
+    tgOptionsGroup.classList.remove("d-none");
+    btnTestTg.classList.remove("d-none");
+  } else {
+    tgOptionsGroup.classList.add("d-none");
+    btnTestTg.classList.add("d-none");
+  }
+});
+
 btnCompare.addEventListener("click", () => {
   const idA = compareA.value;
   const idB = compareB.value;
