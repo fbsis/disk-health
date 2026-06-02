@@ -807,5 +807,23 @@ function formatPerDiskAvail(items) {
     .join("; ");
 }
 
+async function init() {
+  if (!window.cockpit) {
+    console.warn("Cockpit bridge not ready yet. Retrying in 50ms...");
+    setTimeout(init, 50);
+    return;
+  }
+
+  try {
+    const userInfo = await window.cockpit.user();
+    snapshotFilePath = `${userInfo.home}/.local/share/disk-health/snapshots.jsonl`;
+  } catch (err) {
+    console.warn("Failed to get user home directory, using fallback path.", err);
+    snapshotFilePath = "/tmp/snapshots.jsonl";
+  }
+
+  await refreshHistory();
+}
+
 // Start Initialization
 init();
