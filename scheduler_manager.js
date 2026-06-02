@@ -163,9 +163,28 @@ export function setupScheduler() {
   const settingsTgToken = document.getElementById("settings-tg-token");
   const settingsTgChatId = document.getElementById("settings-tg-chat-id");
 
+  const btnSelfTests = document.getElementById("btn-selftests");
+
   // Show modal handler
   if (btnSettings) {
     btnSettings.addEventListener("click", () => {
+      const tabConfigBtn = document.getElementById("tab-config-btn");
+      if (tabConfigBtn && window.bootstrap && window.bootstrap.Tab) {
+        const configTab = window.bootstrap.Tab.getOrCreateInstance(tabConfigBtn);
+        configTab.show();
+      }
+      const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+      modalInstance.show();
+    });
+  }
+
+  if (btnSelfTests) {
+    btnSelfTests.addEventListener("click", () => {
+      const tabLogsBtn = document.getElementById("tab-logs-btn");
+      if (tabLogsBtn && window.bootstrap && window.bootstrap.Tab) {
+        const logsTab = window.bootstrap.Tab.getOrCreateInstance(tabLogsBtn);
+        logsTab.show();
+      }
       const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
       modalInstance.show();
     });
