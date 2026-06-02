@@ -25,39 +25,30 @@ The extension triggers the following host commands. Ensure they are installed on
 
 ## Installation
 
-### 1. Install Cockpit on your Host
-Make sure Cockpit is installed and running on your machine:
-*   **Debian/Ubuntu:**
-    ```bash
-    sudo apt update
-    sudo apt install cockpit
-    ```
-*   **Fedora/RHEL/CentOS:**
-    ```bash
-    sudo dnf install cockpit
-    sudo systemctl enable --now cockpit.socket
-    ```
+Follow these steps to install and use the extension on your Proxmox node:
 
-### 2. Install the Extension
+### 1. Connect to your Proxmox server via SSH
+Log in to your Proxmox node terminal as `root` (or a user with `sudo` privileges).
 
-#### Development / User-specific Mode (Recommended for testing)
-Install it only for the currently logged-in user:
+### 2. Install prerequisites
+Ensure that Cockpit, Git, and SMART utilities are installed on the Proxmox host (since Proxmox is based on Debian, we use `apt`):
 ```bash
-# Create the local cockpit share directory if it doesn't exist
-mkdir -p ~/.local/share/cockpit
-
-# Create a symlink to this project directory
-ln -s /Users/felipebraga/dev/personal/disk-health-remote ~/.local/share/cockpit/disk-health-remote
-```
-*Any changes made in this repository will instantly be loaded when you refresh the Cockpit interface (F5).*
-
-#### Production / System-wide Mode
-Install it globally for all system users:
-```bash
-sudo cp -r /Users/felipebraga/dev/personal/disk-health-remote /usr/share/cockpit/disk-health-remote
+apt update
+apt install git cockpit smartmontools -y
 ```
 
-### 3. Usage
+### 3. Clone the extension repository
+Clone the repository directly into Cockpit's system-wide package directory:
+```bash
+# Create the cockpit directory if it doesn't exist
+mkdir -p /usr/share/cockpit
+
+# Clone the repository from GitHub
+git clone https://github.com/fbsis/disk-health-remote.git /usr/share/cockpit/disk-health-remote
+```
+No build steps or dependency installations are required, as the extension is client-side only.
+
+### 4. Usage
 1. Open your web browser and go to `https://<your-server-ip>:9090`.
 2. Login with your standard Linux system credentials.
 3. Select **"Disk Health"** in the sidebar.
